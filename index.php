@@ -1,6 +1,6 @@
 <?php
 
-echo "<h1>API Index</h1>";
+echo "<h1>HLF.com API Index</h1>";
 
 if( count( $_POST ) > 0 ) {
 	echo "<ol>";
