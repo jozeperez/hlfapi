@@ -21,6 +21,7 @@ class jsonApi {
         'consultant/lead/success' => array( 'status' => "success", 'msg' => "Consultant lead created." )
     );
     private $apiValidActions = array( 'get', 'post', 'put', 'delete' );
+    private $databaseConfig = array();
 
 /**
  * PUBLIC METHODS
@@ -67,6 +68,7 @@ class jsonApi {
      * Response method for the api. Returns everything in json format.
      * @param  array  $responseData Response data in array format to be converted to JSON
      * @return output               Kills process with FINAL output
+     * @private
      */
     private function response( $responseData ) {
         // check integrity of data
@@ -77,6 +79,14 @@ class jsonApi {
 
         // send data in JSON format
         die( json_encode( $responseData ) );
+    }
+
+    /**
+     * Configure database and connect to it
+     * @private
+     */
+    private function databaseInit() {
+
     }
 
     /**
@@ -100,7 +110,7 @@ class jsonApi {
     }
 
     private function _put_product_lead() {
-        $this->response( "IN HERE" );
+        $this->response( $this->apiData );
     }
 
     private function _put_consultant_lead() {
