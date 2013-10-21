@@ -18,9 +18,10 @@ class jsonApi {
         'method/invalid'          => array( 'status' => "error", 'msg' => "Method requested doesn't exist." ),
         'response/invalid'        => array( 'status' => "error", 'msg' => "Invalid data passed to response method." ),
         'database/config/missing' => array( 'status' => "error", 'msg' => "Database configuration file is missing." ),
+        'database/insert/error'   => array( 'status' => "error", 'msg' => "Error occured on insertion into database." ),
         'lead/data/missing'       => array( 'status' => "error", 'msg' => "Missing required data." ),
         // success messages
-        'consultant/lead/success' => array( 'status' => "success", 'msg' => "Consultant lead created." )
+        'lead/product/success'    => array( 'status' => "success", 'msg' => "Product lead created." )
     );
     private $apiValidActions = array( 'get', 'post', 'put', 'delete' );
     private $databaseConfig = array();
@@ -93,7 +94,7 @@ class jsonApi {
     }
 
     /**
-     * Response method for the api. Returns everything in json format.
+     * Response method for the api. Returns everything in json (or jsonp) format.
      * @param  array  $responseData Response data in array format to be converted to JSON
      * @return output               Kills process with FINAL output
      * @private
@@ -105,8 +106,14 @@ class jsonApi {
             $responseData = $this->apiResponses['response/invalid'];
         }
 
+        // send data in JSONP format
+        if( array_key_exists( 'callback', $this->apiData ) && !empty( $this->apiData['callback'] ) ) {
+            die( $this->apiData['callback'].'('.json_encode( $responseData ).')' );
+        }
         // send data in JSON format
-        die( json_encode( $responseData ) );
+        else {
+            die( json_encode( $responseData ) );
+        }
     }
 
     /**
@@ -161,7 +168,16 @@ class jsonApi {
         call_user_func( array( $this, $method ) );
     }
 
+    /**
+     * Validate required fields against pool of possible data fields
+     * @param  array  $requiredFields  Array of required fields
+     * @param  array  $availableFields Array of possible available fields
+     * @param  string $errorToUse      Error code to use on possible requirement infracture
+     * @return void
+     * @private
+     */
     private function validateFields( $requiredFields, $availableFields, $errorToUse = 'lead/data/missing' ) {
+        // check for missing required fields and log them
         $isValid   = TRUE;
         $isMissing = array();
         foreach( $requiredFields as $field ) {
@@ -171,6 +187,7 @@ class jsonApi {
             }
         }
         
+        // if anything is missing, through output here and halt script execution
         if( !$isValid ) {
             $errorMsg     = $this->apiResponses[$errorToUse];
             $errorMsg['debug'] = $isMissing;
@@ -178,6 +195,13 @@ class jsonApi {
         }
     }
 
+    /**
+     * Determine if a single field is available and has data
+     * @param  array  $dbData Array of data going in to the database
+     * @param  string $field  Name of field that will be checked
+     * @return array          New array of data going into the database (possible with an extra field)
+     * @private
+     */
     private function filterForDbData( $dbData, $field ) {
         if( array_key_exists( $field, $this->apiData ) && !empty( $this->apiData[$field] ) ) {
             $dbData[strtoupper( $field )] = trim( $this->apiData[$field] );
@@ -185,6 +209,11 @@ class jsonApi {
         return $dbData;
     }
 
+    /**
+     * Build all data for database (required and extra fields)
+     * @param  array $possibleFields Array of possible fields to add into database data
+     * @return array                 Complete database data array
+     */
     private function buildDbData( $possibleFields ) {
         $dbData = array();
         foreach( $possibleFields as $field ) {
@@ -205,9 +234,19 @@ class jsonApi {
         $dbData = $this->buildDbData( array( 'name', 'telephone', 'product', 'email', 'message' ) );
         if( count( $dbData ) ) {
             // insert into db
-            $sql = "INSERT INTO `product_leads` ({FIELDS}) VALUES ({VALUES})";
-            $sql = str_replace( array( '{FIELDS}', '{VALUES}' ), array( '`'.implode( '`, `', array_keys( $dbData ) ).'`', "'".implode( "','", array_values( $dbData ) )."'" ), $sql );
-            die( $sql );
+            $sql    = "INSERT INTO `product_leads` ({FIELDS}) VALUES ({VALUES})";
+            $sql    = str_replace( array( '{FIELDS}', '{VALUES}' ), array( '`'.implode( '`, `', array_keys( $dbData ) ).'`', "'".implode( "','", array_values( $dbData ) )."'" ), $sql );
+
+            // output request result
+            if( $this->db->query( $sql ) ) {
+                $successMsg       = $this->apiResponses['lead/product/success'];
+                $successMsg['id'] = $this->db->insert_id;
+                $this->response( $successMsg );
+            }
+            // error occured, notify client
+            else {
+                $this->response( $this->apiResponses['database/insert/error'] );
+            }
         }
 
         // missing db data
