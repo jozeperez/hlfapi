@@ -18,10 +18,10 @@ class jsonApi {
         'method/invalid'          => array( 'status' => "error", 'msg' => "Method requested doesn't exist." ),
         'response/invalid'        => array( 'status' => "error", 'msg' => "Invalid data passed to response method." ),
         'database/config/missing' => array( 'status' => "error", 'msg' => "Database configuration file is missing." ),
-        'database/insert/error'   => array( 'status' => "error", 'msg' => "Error occured on insertion into database." ),
+        'database/insert/error'   => array( 'status' => "error", 'msg' => "Problem occured on insertion into database." ),
         'lead/data/missing'       => array( 'status' => "error", 'msg' => "Missing required data." ),
         // success messages
-        'lead/product/success'    => array( 'status' => "success", 'msg' => "Product lead created." )
+        'lead/insert/success'     => array( 'status' => "success", 'msg' => "One of our consultants will contact you as soon as possible. Thank you!" )
     );
     private $apiValidActions = array( 'get', 'post', 'put', 'delete' );
     private $databaseConfig = array();
@@ -228,18 +228,57 @@ class jsonApi {
      */
     private function _put_product_lead() {
         // validate required fields
-        $this->validateFields( array( 'name', 'telephone', 'product' ), $this->apiData );
+        $this->validateFields( array( 'domain', 'name', 'telephone', 'product' ), $this->apiData );
 
         // prepare data for db
-        $dbData = $this->buildDbData( array( 'name', 'telephone', 'product', 'email', 'message' ) );
+        $dbData = $this->buildDbData( array( 'domain', 'name', 'telephone', 'product', 'email', 'message' ) );
         if( count( $dbData ) ) {
+            // set lead type
+            $dbData['LEAD_TYPE'] = 'product';
+
             // insert into db
-            $sql    = "INSERT INTO `product_leads` ({FIELDS}) VALUES ({VALUES})";
-            $sql    = str_replace( array( '{FIELDS}', '{VALUES}' ), array( '`'.implode( '`, `', array_keys( $dbData ) ).'`', "'".implode( "','", array_values( $dbData ) )."'" ), $sql );
+            $sql = "INSERT INTO `leads` ({FIELDS}) VALUES ({VALUES})";
+            $sql = str_replace( array( '{FIELDS}', '{VALUES}' ), array( '`'.implode( '`, `', array_keys( $dbData ) ).'`', "'".implode( "','", array_values( $dbData ) )."'" ), $sql );
 
             // output request result
             if( $this->db->query( $sql ) ) {
-                $successMsg       = $this->apiResponses['lead/product/success'];
+                $successMsg       = $this->apiResponses['lead/insert/success'];
+                $successMsg['id'] = $this->db->insert_id;
+                $this->response( $successMsg );
+            }
+            // error occured, notify client
+            else {
+                $this->response( $this->apiResponses['database/insert/error'] );
+            }
+        }
+
+        // missing db data
+        $errorMsg     = $this->apiResponses['lead/data/missing'];
+        $errorMsg['debug'] = array( 'No Database data present.' );
+        $this->response( $errorMsg );
+    }
+
+    /**
+     * Put NEW contact lead in database
+     * @return string Result of request in JSON format
+     */
+    private function _put_contact_lead() {
+        // validate required fields
+        $this->validateFields( array( 'domain', 'name', 'telephone' ), $this->apiData );
+
+        // prepare data for db
+        $dbData = $this->buildDbData( array( 'domain', 'name', 'telephone', 'email', 'message' ) );
+        if( count( $dbData ) ) {
+            // set lead type
+            $dbData['LEAD_TYPE'] = 'contact';
+
+            // insert into db
+            $sql = "INSERT INTO `leads` ({FIELDS}) VALUES ({VALUES})";
+            $sql = str_replace( array( '{FIELDS}', '{VALUES}' ), array( '`'.implode( '`, `', array_keys( $dbData ) ).'`', "'".implode( "','", array_values( $dbData ) )."'" ), $sql );
+
+            // output request result
+            if( $this->db->query( $sql ) ) {
+                $successMsg       = $this->apiResponses['lead/insert/success'];
                 $successMsg['id'] = $this->db->insert_id;
                 $this->response( $successMsg );
             }
