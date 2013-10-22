@@ -223,26 +223,32 @@ class jsonApi {
     }
 
     /**
-     * Put NEW product lead in database
-     * @return string Result of request in JSON format
+     * Handle all INSERT statements into database
+     * @param  string $leadType       Type of lead
+     * @param  array  $requiredFields List of required fields
+     * @param  array  $possibleFields List of all available fields
+     * @param  array  $responseKeys   Custom response keys
+     * @param  string $table          Default db table to insert into
+     * @return void
+     * @private
      */
-    private function _put_product_lead() {
+    private function insertLeadSql( $leadType, $requiredFields, $possibleFields, $responseKeys, $table = 'leads' ) {
         // validate required fields
-        $this->validateFields( array( 'domain', 'name', 'telephone', 'product' ), $this->apiData );
+        $this->validateFields( $requiredFields, $this->apiData );
 
         // prepare data for db
-        $dbData = $this->buildDbData( array( 'domain', 'name', 'telephone', 'product', 'email', 'message' ) );
+        $dbData = $this->buildDbData( $possibleFields );
         if( count( $dbData ) ) {
             // set lead type
-            $dbData['LEAD_TYPE'] = 'product';
+            $dbData['LEAD_TYPE'] = $leadType;
 
             // insert into db
-            $sql = "INSERT INTO `leads` ({FIELDS}) VALUES ({VALUES})";
+            $sql = "INSERT INTO `$table` ({FIELDS}) VALUES ({VALUES})";
             $sql = str_replace( array( '{FIELDS}', '{VALUES}' ), array( '`'.implode( '`, `', array_keys( $dbData ) ).'`', "'".implode( "','", array_values( $dbData ) )."'" ), $sql );
 
             // output request result
             if( $this->db->query( $sql ) ) {
-                $successMsg       = $this->apiResponses['lead/insert/success'];
+                $successMsg       = $this->apiResponses[$responseKeys['success']];
                 $successMsg['id'] = $this->db->insert_id;
                 $this->response( $successMsg );
             }
@@ -259,39 +265,45 @@ class jsonApi {
     }
 
     /**
+     * Put NEW product lead in database
+     * @return string Result of request in JSON format
+     */
+    private function _put_product_lead() {
+        // required variables
+        $requiredFields = array( 'domain', 'name', 'telephone', 'product' );
+        $possibleFields = array_merge( $requiredFields, array( 'email', 'message' ) );
+        $responseKeys   = array( 'success' => 'lead/insert/success' );
+        
+        // handle DB insertion
+        $this->insertLeadSql( 'product', $requiredFields, $possibleFields, $responseKeys );
+    }
+
+    /**
      * Put NEW contact lead in database
      * @return string Result of request in JSON format
      */
     private function _put_contact_lead() {
-        // validate required fields
-        $this->validateFields( array( 'domain', 'name', 'telephone' ), $this->apiData );
+        // required variables
+        $requiredFields = array( 'domain', 'name', 'telephone' );
+        $possibleFields = array_merge( $requiredFields, array( 'email', 'message' ) );
+        $responseKeys   = array( 'success' => 'lead/insert/success' );
+        
+        // handle DB insertion
+        $this->insertLeadSql( 'contact', $requiredFields, $possibleFields, $responseKeys );
+    }
 
-        // prepare data for db
-        $dbData = $this->buildDbData( array( 'domain', 'name', 'telephone', 'email', 'message' ) );
-        if( count( $dbData ) ) {
-            // set lead type
-            $dbData['LEAD_TYPE'] = 'contact';
-
-            // insert into db
-            $sql = "INSERT INTO `leads` ({FIELDS}) VALUES ({VALUES})";
-            $sql = str_replace( array( '{FIELDS}', '{VALUES}' ), array( '`'.implode( '`, `', array_keys( $dbData ) ).'`', "'".implode( "','", array_values( $dbData ) )."'" ), $sql );
-
-            // output request result
-            if( $this->db->query( $sql ) ) {
-                $successMsg       = $this->apiResponses['lead/insert/success'];
-                $successMsg['id'] = $this->db->insert_id;
-                $this->response( $successMsg );
-            }
-            // error occured, notify client
-            else {
-                $this->response( $this->apiResponses['database/insert/error'] );
-            }
-        }
-
-        // missing db data
-        $errorMsg     = $this->apiResponses['lead/data/missing'];
-        $errorMsg['debug'] = array( 'No Database data present.' );
-        $this->response( $errorMsg );
+    /**
+     * Put NEW consultant lead in database
+     * @return string Result of request in JSON format
+     */
+    private function _put_consultant_lead() {
+        // required variables
+        $requiredFields = array( 'domain', 'name', 'telephone', 'email', 'message' );
+        $possibleFields = $requiredFields;
+        $responseKeys   = array( 'success' => 'lead/insert/success' );
+        
+        // handle DB insertion
+        $this->insertLeadSql( 'consultant', $requiredFields, $possibleFields, $responseKeys );
     }
 
 }
